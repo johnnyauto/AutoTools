@@ -109,8 +109,11 @@ for group_lable, group_data in df_group:
         if pd.isna(unit):
             unit = ''
 
+        receiver = group_data['Receiver'].iloc[index]
+        receiver = receiver.replace('\n',',')
+
         #SG_ {signal_name} {multiplexer_indicator} : {start_bit}|{signal_size}@{byte_order}{value_type} ({factor},{offset}) [{minimum}|{maximum}] "{unit}" {receiver}
-        output_seg03 += f' SG_ {signal_name} : {start_bit}|{signal_size}@{byte_order}{value_type} ({factor},{offset}) [{minimum}|{maximum}] "{unit}"\n'
+        output_seg03 += f' SG_ {signal_name} : {start_bit}|{signal_size}@{byte_order}{value_type} ({factor},{offset}) [{minimum}|{maximum}] "{unit}" {receiver}\n'
 
         if index == len(group_data)-1:
             output_seg03 += '\n'
