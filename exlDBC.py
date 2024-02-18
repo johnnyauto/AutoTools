@@ -220,8 +220,8 @@ for group_index, group_data in df_group:
                         # 使用正則表達式將資料 0xAA~0xBB:CCCC 分割為 '0xAA', '0xBB' 和 'CCCC' 三部分
                         print(data)
                         pattern = re.compile(r'(\w+x\w+)~(\w+x\w+):(\w+)')
-                        match = pattern.match(data)
-                        start, end, Description = match.groups()
+                        regular_data = pattern.match(data)
+                        start, end, Description = regular_data.groups()
                         for Value in range(int(start, 16), int(end, 16)+1):
                             Value_Description = f'{Value} "{Description}" '
                             output_seg06 += f'VAL_ {message_id} {signal_name} {Value_Description};\n'
