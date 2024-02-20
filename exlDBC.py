@@ -2,24 +2,18 @@ import pandas as pd
 import openpyxl
 # import re
 
+# function: process val for SG_
 def sg_value(group_data, colName, dataIndex):
-    #print(colName)
     val = group_data[colName].iloc[dataIndex]
-    val = str(val).replace("\n(0xFF)","")
-    #print(val)
-    if pd.isna(val):
-        #print('isna')
-        val = 0
-        #print(val)
-    elif val == 'nan' or val == 'None':
-        #print('nan_None')
+    val = str(val).replace("\n(0xFF)","")   # remove "\n(0xFF)"
+    # convert empty data to 0
+    if pd.isna(val) or val == 'nan' or val == 'None':
         val = 0
     else:
-        #print('notna')
-        #print(val)
         pass
     return val
 
+# function: generate DBC
 def gen_dbc(sheet_name, bus_type):
     worksheet = workbook[sheet_name]
 
@@ -70,10 +64,23 @@ def gen_dbc(sheet_name, bus_type):
     # BU_: {node_name_1} {node_name_2} ...
     output_seg02 = 'BU_: '
 
+    # add node_name from 'Transmitter'
     df_group = df.groupby('Transmitter')
     Transmitter = list(df_group.groups.keys())
     for node_name in Transmitter:
         output_seg02 += f'{node_name} '
+
+    # add node_name from 'Receiver' but exclude duplicates in 'Transmitter'
+    df_group = df.groupby('Receiver')
+    Receiver = list(df_group.groups.keys())
+    for node_name in Receiver:
+        node_name = node_name.replace("\n","/")
+        node_name_split = node_name.split("/")
+        for receiver_node_name in node_name_split:
+            if receiver_node_name in Transmitter:
+                print(receiver_node_name)
+            else:
+                output_seg02 += f'{receiver_node_name} '
 
     output_seg02 += '\n\n\n'
 
@@ -107,19 +114,15 @@ def gen_dbc(sheet_name, bus_type):
             signal_size = group_data['size(bit)'].iloc[dataIndex].astype(int)
 
             # factor
-            #factor = group_data['Factor'].iloc[dataIndex].astype(int)
             factor = sg_value(group_data, 'Factor', dataIndex)
 
             # offset
-            #offset = group_data['Offset'].iloc[dataIndex].astype(int)
             offset = sg_value(group_data, 'Offset', dataIndex)
 
             # minimum
-            #minimum = group_data['P-Minimum'].iloc[dataIndex].astype(int)
             minimum = sg_value(group_data, 'P-Minimum', dataIndex)
 
             # maximum
-            #maximum = group_data['P-Maximum'].iloc[dataIndex].astype(int)
             maximum = sg_value(group_data, 'P-Maximum', dataIndex)
 
             # start_bit | byte_order
@@ -205,7 +208,6 @@ def gen_dbc(sheet_name, bus_type):
         message_size = group_data['DLC'].iloc[0].astype(int)
 
         if message_type == 'P':
-            # setup for "GenMsgCycleTime", "GenMsgSendType" use default
             MsgCycleTime = group_data['period\n(ms)'].iloc[0].astype(int)
             output_seg04 += f'BA_ "GenMsgCycleTime" BO_ {message_id} {MsgCycleTime};\n'
         elif message_type == 'E' or message_type == 'M':
@@ -263,21 +265,23 @@ def gen_dbc(sheet_name, bus_type):
 
                     Value_Description = ''
                     for data in ValTable_split:
-                        if '~' in data:
-                                                       
+                        r"""
+                        if '~' in data:     
                             # use regular expression to separate data (0xAA~0xBB:CCCC) into three parts:'0xAA', '0xBB' and 'CCCC'
-                            #pattern = re.compile(r'(\w+x\w+)~(\w+x\w+):(\w+)')
-                            #regular_data = pattern.match(data)
-                            #start, end, Description = regular_data.groups()
-                            #for Value in range(int(start, 16), int(end, 16)+1):
-                                #Value_Description = f'{Value} "{Description}" '
-                                #output_seg06 += f'VAL_ {message_id} {signal_name} {Value_Description};\n'
+                            pattern = re.compile(r'(\w+x\w+)~(\w+x\w+):(\w+)')
+                            regular_data = pattern.match(data)
+                            start, end, Description = regular_data.groups()
+                            for Value in range(int(start, 16), int(end, 16)+1):
+                                Value_Description = f'{Value} "{Description}" '
+                                output_seg06 += f'VAL_ {message_id} {signal_name} {Value_Description};\n'
                             
                             # do not porcess data containing '~', because the range of some value is too large
                             gen_ValTable = False
                             continue
                         elif 'EMMC_BYTE_' in signal_name:
-                            #print('EMMC')
+                        """
+                        if 'EMMC_BYTE_' in signal_name:
+                            # ValTable is not generated when the signal name contains "EMMC_BYTE_"
                             gen_ValTable = False
                         else:
                             # split data to two elements (Value & Description) by ':'
@@ -286,10 +290,15 @@ def gen_dbc(sheet_name, bus_type):
                             # due to some data lacks ':', use " " to split instead
                             if len(data_split) == 1:
                                 data_split = data.split(" ", 1)
-
-                            Value = int(data_split[0], 16)  # convert Hex to Dec
-                            Description = data_split[1]
-                            Value_Description += f'{Value} "{Description}" '
+                            
+                            # do not porcess data containing '~'
+                            if '~' in data_split[0]:
+                                Value =''
+                                Description =''
+                            else:
+                                Value = int(data_split[0], 16)  # convert Hex to Dec
+                                Description = f'"{data_split[1]}" '
+                            Value_Description += f'{Value} {Description}'
                     
                     # if gen_ValTable is True, generates ValTable
                     if gen_ValTable:
@@ -310,15 +319,16 @@ print('This program will generate DBC files from excel.\n')
 excel_file = input('Please enter excel file name: ')
 if not '.xlsx' in excel_file:
     excel_file += '.xlsx'
-#sheet_name_list = ['CAN01_Matrix', 'CAN02_Matrix']
 workbook = openpyxl.load_workbook(excel_file, data_only=True)
 """
+sheet_name_list = ['CAN01_Matrix', 'CAN02_Matrix']
+workbook = openpyxl.load_workbook(excel_file, data_only=True)
+
 for name in sheet_name_list:
     gen_dbc(sheet_name = name)
 
 input('\nCompleted! Press [Enter] to exit this program.')
 """
-
 while True:
     # get sheet name for workbook and ptint it
     sheet_name_list = workbook.sheetnames
@@ -332,14 +342,17 @@ while True:
         break
     else:
         print('\nCAN bus types:\n1. CAN\n2. CAN FD')
-        busType = input("請選擇BusType (輸入數字; Default: 1): ")
+        busType = input("請選擇BusType(輸入數字; Default: 1), 或輸入'q'結束程式: ")
         if busType == '2':
             busType = 'CAN FD'
+        elif busType.lower() == 'q':
+            break
         else:
             busType = 'CAN'
 
         sheetName = sheet_name_list[int(sheet_index)]
-        gen_dbc(sheet_name = sheetName, bus_type = busType)
-
-
-
+        try:
+            gen_dbc(sheet_name = sheetName, bus_type = busType)
+        except:
+            print('\nError! 請檢查sheet是否正確')
+            input('Press [Enter] to continue.\n')
