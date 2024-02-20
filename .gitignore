@@ -1,0 +1,8 @@
+
+LICENSE
+dist/
+build/
+*.spec
+*.dbc
+*.xlsx
+
