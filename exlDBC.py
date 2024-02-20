@@ -2,8 +2,25 @@ import pandas as pd
 import openpyxl
 # import re
 
+def sg_value(group_data, colName, dataIndex):
+    #print(colName)
+    val = group_data[colName].iloc[dataIndex]
+    val = str(val).replace("\n(0xFF)","")
+    #print(val)
+    if pd.isna(val):
+        #print('isna')
+        val = 0
+        #print(val)
+    elif val == 'nan' or val == 'None':
+        #print('nan_None')
+        val = 0
+    else:
+        #print('notna')
+        #print(val)
+        pass
+    return val
 
-def gen_dbc(sheet_name):
+def gen_dbc(sheet_name, bus_type):
     worksheet = workbook[sheet_name]
 
     """ Process Data (remove Empty and Strikethrough format data) """
@@ -90,16 +107,20 @@ def gen_dbc(sheet_name):
             signal_size = group_data['size(bit)'].iloc[dataIndex].astype(int)
 
             # factor
-            factor = group_data['Factor'].iloc[dataIndex].astype(int)
+            #factor = group_data['Factor'].iloc[dataIndex].astype(int)
+            factor = sg_value(group_data, 'Factor', dataIndex)
 
             # offset
-            offset = group_data['Offset'].iloc[dataIndex].astype(int)
+            #offset = group_data['Offset'].iloc[dataIndex].astype(int)
+            offset = sg_value(group_data, 'Offset', dataIndex)
 
             # minimum
-            minimum = group_data['P-Minimum'].iloc[dataIndex].astype(int)
+            #minimum = group_data['P-Minimum'].iloc[dataIndex].astype(int)
+            minimum = sg_value(group_data, 'P-Minimum', dataIndex)
 
             # maximum
-            maximum = group_data['P-Maximum'].iloc[dataIndex].astype(int)
+            #maximum = group_data['P-Maximum'].iloc[dataIndex].astype(int)
+            maximum = sg_value(group_data, 'P-Maximum', dataIndex)
 
             # start_bit | byte_order
             ByteOrder = group_data['Byte Order'].iloc[dataIndex]
@@ -109,23 +130,27 @@ def gen_dbc(sheet_name):
             else:   # Intel
                 start_bit = group_data['Lab'].iloc[dataIndex].astype(int)
                 byte_order = '1'
+            
             # value_type
             DataType = group_data['Data Type'].iloc[dataIndex]
             if DataType == 'unsigned':
                 value_type = '+'
             else:   # signed
                 value_type = '-'
+            
             # unit
             unit = group_data['Unit'].iloc[dataIndex]
             if pd.isna(unit):
                 unit = ''
+            
             # receiver
             receiver = group_data['Receiver'].iloc[dataIndex]
             receiver = receiver.replace('\n',',')
             receiver = receiver.replace('/',',')
 
             # SG_ {signal_name} {multiplexer_indicator} : {start_bit}|{signal_size}@{byte_order}{value_type} ({factor},{offset}) [{minimum}|{maximum}] "{unit}" {receiver}
-            output_seg03 += f' SG_ {signal_name} {multiplexer_indicator}: {start_bit}|{signal_size}@{byte_order}{value_type} ({factor},{offset}) [{minimum}|{maximum}] "{unit}" {receiver}\n'
+            if not 'EMMC_BYTE_' in signal_name:
+                output_seg03 += f' SG_ {signal_name} {multiplexer_indicator}: {start_bit}|{signal_size}@{byte_order}{value_type} ({factor},{offset}) [{minimum}|{maximum}] "{unit}" {receiver}\n'
 
             if dataIndex == len(group_data)-1:
                 output_seg03 += '\n'
@@ -135,6 +160,7 @@ def gen_dbc(sheet_name):
     """ output_seg04 """
     # BA_DEF_
     output_seg04 = ''
+    output_seg04 += 'BA_DEF_  "BusType" STRING ;\n'
     output_seg04 += 'BA_DEF_ BO_  "GenMsgFastOnStart" INT 0 0;\n'
     output_seg04 += 'BA_DEF_ SG_  "GenSigInactiveValue" INT 0 0;\n'
     output_seg04 += 'BA_DEF_ BU_  "ILUsed" ENUM  "Yes","No";\n'
@@ -147,8 +173,10 @@ def gen_dbc(sheet_name):
     output_seg04 += 'BA_DEF_ BO_  "GenMsgCycleTimeFast" INT 0 100000;\n'
     output_seg04 += 'BA_DEF_ BO_  "GenMsgILSupport" ENUM  "No","Yes";\n'
     output_seg04 += 'BA_DEF_ BO_  "GenMsgStartDelayTime" INT 0 100000;\n'
+    output_seg04 += 'BA_DEF_ BO_  "VFrameFormat" ENUM  "StandardCAN","ExtendedCAN","reserved","reserved","reserved","reserved","reserved","reserved","reserved","reserved","reserved","reserved","reserved","reserved","StandardCAN_FD","ExtendedCAN_FD";\n'
     output_seg04 += 'BA_DEF_ BU_  "NodeLayerModules" STRING ;\n'
     # BA_DEF_DEF_
+    output_seg04 += 'BA_DEF_DEF_  "BusType" "";\n'
     output_seg04 += 'BA_DEF_DEF_  "GenMsgFastOnStart" 0;\n'
     output_seg04 += 'BA_DEF_DEF_  "GenSigInactiveValue" 0;\n'
     output_seg04 += 'BA_DEF_DEF_  "ILUsed" "Yes";\n'
@@ -161,7 +189,10 @@ def gen_dbc(sheet_name):
     output_seg04 += 'BA_DEF_DEF_  "GenMsgCycleTimeFast" 0;\n'
     output_seg04 += 'BA_DEF_DEF_  "GenMsgILSupport" "No";\n'
     output_seg04 += 'BA_DEF_DEF_  "GenMsgStartDelayTime" 0;\n'
+    output_seg04 += 'BA_DEF_DEF_  "VFrameFormat" "StandardCAN";\n'
     output_seg04 += 'BA_DEF_DEF_  "NodeLayerModules" "CANoeILNLVector.dll";\n'
+    #output_seg04 += 'BA_ "BusType" "CAN FD";\n'
+    output_seg04 += f'BA_ "BusType" "{bus_type}";\n'
 
     """ output_seg05 & output_seg06 """
     # BA_
@@ -171,6 +202,7 @@ def gen_dbc(sheet_name):
     for group_index, group_data in df_group:
         message_id = group_data['Message ID'].iloc[0]
         message_type = group_data['Message Type'].iloc[0]
+        message_size = group_data['DLC'].iloc[0].astype(int)
 
         if message_type == 'P':
             # setup for "GenMsgCycleTime", "GenMsgSendType" use default
@@ -180,13 +212,22 @@ def gen_dbc(sheet_name):
             # setup for "GenMsgSendType"
             MsgSendType = '8'   # NoMsgSendType
             output_seg04 += f'BA_ "GenMsgSendType" BO_ {message_id} {MsgSendType};\n'
+        else:
+            pass
 
+        # identify CANFD
+        if message_size > 8:
+            VFrameFormat = '14'   #StandardCAN_FD
+            output_seg05 += f'BA_ "VFrameFormat" BO_ {message_id} {VFrameFormat};\n'
+        
             for dataIndex in range(len(group_data)):
                 signal_name = group_data['Signal Name'].iloc[dataIndex]
                 signal_name = signal_name.replace('\n','')
                 signal_name = signal_name.replace(' ','')
                 SigSendType = 1 # OnWrite
-                output_seg05 += f'BA_ "GenSigSendType" SG_ {message_id} {signal_name} {SigSendType};\n'
+                if not 'EMMC_BYTE_' in signal_name:
+                    output_seg05 += f'BA_ "GenSigSendType" SG_ {message_id} {signal_name} {SigSendType};\n'
+                
     # VAL_
         for dataIndex in range(len(group_data)):
             # A flag used to determine whether to generate a ValTable
@@ -216,6 +257,7 @@ def gen_dbc(sheet_name):
                     signal_name = signal_name.replace('\n','')
                     signal_name = signal_name.replace('(PS:自定义)','')
                     
+                    
                     # split the ValTable by '\n' and save the results to a list
                     ValTable_split = ValTable.split("\n")
 
@@ -234,6 +276,9 @@ def gen_dbc(sheet_name):
                             # do not porcess data containing '~', because the range of some value is too large
                             gen_ValTable = False
                             continue
+                        elif 'EMMC_BYTE_' in signal_name:
+                            #print('EMMC')
+                            gen_ValTable = False
                         else:
                             # split data to two elements (Value & Description) by ':'
                             data_split = data.split(":", 1)
@@ -256,28 +301,45 @@ def gen_dbc(sheet_name):
     DBC_name = sheet_name+'.dbc'
     with open(DBC_name, 'w', encoding='utf-8') as f:
         f.write(output_text)
-    print(f'{DBC_name} is generated.')
+    print(f'\n{DBC_name} is generated.\n')
 
 
 """ Main """
-# load Excel file
-print('This program will generate DBC files from excel.\n\n')
+ # load Excel file
+print('This program will generate DBC files from excel.\n')
 excel_file = input('Please enter excel file name: ')
-sheet_name_list = ['CAN01_Matrix', 'CAN02_Matrix']
+if not '.xlsx' in excel_file:
+    excel_file += '.xlsx'
+#sheet_name_list = ['CAN01_Matrix', 'CAN02_Matrix']
 workbook = openpyxl.load_workbook(excel_file, data_only=True)
-
+"""
 for name in sheet_name_list:
     gen_dbc(sheet_name = name)
 
 input('\nCompleted! Press [Enter] to exit this program.')
-
 """
-# get sheet name for workbook and ptint it
-sheet_name_list = workbook.sheetnames
-for index, sn in enumerate(sheet_name_list):
-    print(f'{index}: {sn}')
 
-sheet_index = input("請選擇一個sheet(輸入數字ex: 10)生成DBC: ")
-sheet_name = sheet_name_list[int(sheet_index)]
-worksheet = workbook[sheet_name]
-"""
+while True:
+    # get sheet name for workbook and ptint it
+    sheet_name_list = workbook.sheetnames
+    print('\nSheet list:')
+    for index, sheetName in enumerate(sheet_name_list):
+        print(f'{index}: {sheetName}')
+    
+    sheet_index = input("請選擇一個sheet(輸入數字)生成DBC, 或輸入'q'結束程式: ")
+
+    if sheet_index.lower() == 'q':
+        break
+    else:
+        print('\nCAN bus types:\n1. CAN\n2. CAN FD')
+        busType = input("請選擇BusType (輸入數字; Default: 1): ")
+        if busType == '2':
+            busType = 'CAN FD'
+        else:
+            busType = 'CAN'
+
+        sheetName = sheet_name_list[int(sheet_index)]
+        gen_dbc(sheet_name = sheetName, bus_type = busType)
+
+
+
