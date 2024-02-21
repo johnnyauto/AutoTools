@@ -4,20 +4,17 @@ import openpyxl
 
 ##### fun(): check for special cases in signal names #####
 def chk_signalname(sigName):
-    match sigName:
-        case 'AutoHiLowBeamSwtSts_HCMAutoHiLowBeamSwtSts':
-            sigName = 'AutoHiLowBeamSwtSts'
-        case 'HUT_TurnLeftLightReqTurnLeftLightReq_HUT':
-            sigName = 'TurnLeftLightReq_HUT'
-        case 'HUT_TurnRightLightReqTurnRightLightReq_HUT':
-            sigName = 'TurnRightLightReq_HUT'
-        case 'DomeLampDelayTimeSetDomelmpDlyTimSet_HUT':
-            sigName = 'DomelmpDlyTimSet_HUT'
-        case 'CEM_FrntWinHeatEnaStsFrntWinHeatEnaSts':
-            sigName = 'FrntWinHeatEnaSts'
-        case _:
-            pass
-    return sigName
+    sigName = sigName.replace('(PS:自定义)','')
+    sigName = sigName.replace(' \n(PS: 自定义)','')
+    sigName = sigName.replace(' ','')
+    if '\n' in sigName and not 'EMMC_BYTE_' in sigName:
+        sigName_split = sigName.split('\n')
+        final_sigName = sigName_split[len(sigName_split)-1]
+        #print(sigName,'  --->  ', final_sigName)
+    else:
+        sigName = sigName.replace('\n','')
+        final_sigName = sigName
+    return final_sigName
 
 ##### fun(): process val for SG_ #####
 def sg_value(group_data, colName, dataIndex):
@@ -123,9 +120,7 @@ def gen_dbc(sheet_name, bus_type, il_support):
         for dataIndex in range(len(group_data)):
             # signal_name
             signal_name = group_data['Signal Name'].iloc[dataIndex]
-            signal_name = signal_name.replace(' ','')
-            signal_name = signal_name.replace('\n','')
-            signal_name = signal_name.replace('(PS:自定义)','')
+            signal_name = chk_signalname(signal_name)
 
             # multiplexer_indicator
             multiplexer_indicator = ''
@@ -173,7 +168,6 @@ def gen_dbc(sheet_name, bus_type, il_support):
 
             # SG_ {signal_name} {multiplexer_indicator} : {start_bit}|{signal_size}@{byte_order}{value_type} ({factor},{offset}) [{minimum}|{maximum}] "{unit}" {receiver}
             if not 'EMMC_BYTE_' in signal_name:
-                signal_name = chk_signalname(signal_name)
                 output_seg03 += f' SG_ {signal_name} {multiplexer_indicator}: {start_bit}|{signal_size}@{byte_order}{value_type} ({factor},{offset}) [{minimum}|{maximum}] "{unit}" {receiver}\n'
             # only for EMMC_BYTE_# signals
             else:
@@ -225,7 +219,6 @@ def gen_dbc(sheet_name, bus_type, il_support):
     output_seg04 += 'BA_DEF_DEF_  "GenMsgStartDelayTime" 0;\n'
     output_seg04 += 'BA_DEF_DEF_  "VFrameFormat" "StandardCAN";\n'
     output_seg04 += 'BA_DEF_DEF_  "NodeLayerModules" "CANoeILNLVector.dll";\n'
-    #output_seg04 += 'BA_ "BusType" "CAN FD";\n'
     output_seg04 += f'BA_ "BusType" "{bus_type}";\n'
 
     ##### output_seg05 & output_seg06 #####
@@ -255,8 +248,7 @@ def gen_dbc(sheet_name, bus_type, il_support):
         
             for dataIndex in range(len(group_data)):
                 signal_name = group_data['Signal Name'].iloc[dataIndex]
-                signal_name = signal_name.replace('\n','')
-                signal_name = signal_name.replace(' ','')
+                signal_name = chk_signalname(signal_name)
                 SigSendType = 1 # OnWrite
                 if not 'EMMC_BYTE_' in signal_name:
                     output_seg05 += f'BA_ "GenSigSendType" SG_ {message_id} {signal_name} {SigSendType};\n'
@@ -284,9 +276,6 @@ def gen_dbc(sheet_name, bus_type, il_support):
 
                 # process the signal_name
                 signal_name = group_data['Signal Name'].iloc[dataIndex]
-                signal_name = signal_name.replace(' ','')
-                signal_name = signal_name.replace('\n','')
-                signal_name = signal_name.replace('(PS:自定义)','')
                 signal_name = chk_signalname(signal_name)
                 
                 # split the ValTable by '\n' and save the results to a list
@@ -397,5 +386,6 @@ while True:
         except:
             print('\nError! 請確認所選擇的sheet內容是否正確')
             input('Press [Enter] to continue.\n')
+        
 
 
