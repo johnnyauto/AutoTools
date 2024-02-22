@@ -60,7 +60,7 @@ def gen_dbc(sheet_name, bus_type, il_support):
     df['Message ID'] = df['Message ID'].apply(lambda x: int(x, 16))
 
 
-    ##### output_seg01 #####
+    ##### output_seg01 [VERSION | NS_] #####
     # VERSION
     output_seg01 = 'VERSION ""\n\n\n'
 
@@ -78,7 +78,7 @@ def gen_dbc(sheet_name, bus_type, il_support):
     output_seg01 += 'BS_:\n\n'
 
 
-    ##### output_seg02 #####
+    ##### output_seg02 [BU_] #####
     # BU_
     # BU_: {node_name_1} {node_name_2} ...
     output_seg02 = 'BU_: '
@@ -102,10 +102,11 @@ def gen_dbc(sheet_name, bus_type, il_support):
     output_seg02 += '\n\n\n'
 
 
-    ##### output_seg03 #####
+    ##### output_seg03 [BO_ | SG_] #####
     # BO_ 
     output_seg03 =""
     df_group = df.groupby('Message Name')
+    # get the first data of each group through group_index
     for group_index, group_data in df_group:
         transmitter = group_data['Transmitter'].iloc[0]
         if pd.isna(transmitter):
@@ -185,7 +186,7 @@ def gen_dbc(sheet_name, bus_type, il_support):
     output_seg03 += '\n\n'
 
 
-    ##### output_seg04 #####
+    ##### output_seg04 [BA_DEF_ | BA_DEF_DEF_] #####
     # BA_DEF_
     output_seg04 = ''
     output_seg04 += 'BA_DEF_  "BusType" STRING ;\n'
@@ -221,16 +222,18 @@ def gen_dbc(sheet_name, bus_type, il_support):
     output_seg04 += 'BA_DEF_DEF_  "NodeLayerModules" "CANoeILNLVector.dll";\n'
     output_seg04 += f'BA_ "BusType" "{bus_type}";\n'
 
-    ##### output_seg05 & output_seg06 #####
+    ##### output_seg05 [BA_] & output_seg06 [VAL_] #####
     # BA_
     output_seg05 = ''
     output_seg06 = ''
 
+    # get the first data of each group through group_index
     for group_index, group_data in df_group:
         message_id = group_data['Message ID'].iloc[0]
         message_type = group_data['Message Type'].iloc[0]
         message_size = group_data['DLC'].iloc[0].astype(int)
 
+        # identify MsgSendType
         if message_type == 'P':
             MsgCycleTime = group_data['period\n(ms)'].iloc[0].astype(int)
             output_seg04 += f'BA_ "GenMsgCycleTime" BO_ {message_id} {MsgCycleTime};\n'
