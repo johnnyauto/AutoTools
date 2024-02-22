@@ -1,0 +1,56 @@
+
+
+LIN_description_file;
+LIN_protocol_version = "2.1";
+LIN_language_version = "2.1";
+LIN_speed = 19.2 kbps;
+
+Nodes {
+   Master: RLN, 10 ms, 0.1 ms ;
+   Slave: BCM, DHL, HFA, LIN尾燈, PWM, RLS, BCM, CEM ;
+}
+
+Signals {
+  WiprReq: 3, 10, RLS, BCM ;
+  PosnLightReq: 1, 0, RLS, BCM ;
+  LowBeamReq: 1, 0, RLS, BCM ;
+  RLS_RespErr: 1, 0, RLS, BCM ;
+  LightSnsrFailSts: 1, 0, RLS, BCM ;
+  RainSnsrFailSts: 1, 0, RLS, BCM ;
+  TempFailSts: 1, 0, RLS, BCM ;
+  InitnFailSts: 1, 0, RLS, BCM ;
+  VoltFailSts: 1, 0, RLS, BCM ;
+  CloseSRReq: 1, 0, RLS, BCM ;
+  VehTypFailrSts: 1, 0, RLS, BCM ;
+  DHL_DoorHndlReq: 2, 0, DHL, BCM ;
+  DHL_LockSnsrErr: 1, 0, DHL, BCM ;
+  DHL_UnlockSnsrErr: 1, 0, DHL, BCM ;
+  HFA_OperReq: 2, 0, HFA, BCM ;
+  HFA_RespErr: 2, 0, HFA, BCM ;
+  HFA_HWErr: 1, 0, HFA, BCM ;
+  CentralCtrlLockSwtErrSts: 1, 0, PWM, BCM ;
+  PowerCutSwtErrSts: 1, 0, PWM, BCM ;
+  CentralCtrlLockSwt: 1, 0, PWM, BCM ;
+  PowerCutSwt: 1, 0, PWM, BCM ;
+  MirrFoldSwt: 1, 0, PWM, BCM ;
+  MirrFold_LSeldSwtErrSts: 1, 0, PWM, BCM ;
+  MirrFold_RSeldSwtErrSts: 1, 0, PWM, BCM ;
+  Mirr_Swt_Cmd: 4, 0, PWM, BCM ;
+  Mirr_Swt_CmdErrSts: 1, 0, PWM, BCM ;
+  RFLBrkLmpSts: 1, 0, LIN尾燈, CEM ;
+  LBrkLmpFailSts_RLN: 1, 0, RLN, BCM ;
+  RBrkLmpFailSts_RLN: 1, 0, RLN, BCM ;
+  HiPosnBrkBeamFailSts_RLN: 1, 0, RLN, BCM ;
+  LPosnBeamFailSts_RLN: 1, 0, RLN, BCM ;
+  RPosnBeamFailSts_RLN: 1, 0, RLN, BCM ;
+  LTurnBeamFailSts_RLN: 1, 0, RLN, BCM ;
+  RTurnBeamFailSts_RLN: 1, 0, RLN, BCM ;
+  LRvrsBeamFailSts_RLN: 1, 0, RLN, BCM ;
+  RRvrsBeamFailSts_RLN: 1, 0, RLN, BCM ;
+  RTurnLmpWorkCmd_RLN: 1, 0, BCM, RLN ;
+  LTurnLmpWorkCmd_RLN: 1, 0, BCM, RLN ;
+  RRPosnLmpWorkCmd_RLN: 1, 0, BCM, RLN ;
+  LRPosnLmpWorkCmd_RLN: 1, 0, BCM, RLN ;
+  ReversLampWorkCmd_RLN: 1, 0, BCM, RLN ;
+  BrkLmpWorkCmd_RLN: 1, 0, BCM, RLN ;
+}
