@@ -53,6 +53,9 @@ def ldf_notes(df, slave_node_list):
     Transmitter = list(df_group_tx.groups.keys())
     Receiver = list(df_group_rx.groups.keys())
     notes_list = Transmitter + Receiver
+    # remove duplite data for notes_list
+    notes_list = list(set(notes_list))
+    notes_list.sort()
     for index, node in enumerate(notes_list):
         print(f'{index}: {node}')
 
@@ -68,7 +71,7 @@ def ldf_notes(df, slave_node_list):
 
     output_seg02 = '\nNodes {\n'
     output_seg02 += f'  Master: {master_node}, {time_base} ms, {jitter} ms ;\n'
-    output_seg02 += f'  Slave: {slave_nodes} ;\n'
+    output_seg02 += f'  Slaves: {slave_nodes} ;\n'
     output_seg02 += '}\n'
     return output_seg02
 
@@ -113,7 +116,7 @@ def ldf_diag_sig(df):
     output_seg04 += '  SlaveRespB5: 8, 0 ;\n'
     output_seg04 += '  SlaveRespB6: 8, 0 ;\n'
     output_seg04 += '  SlaveRespB7: 8, 0 ;\n'
-    output_seg04 += '}\n'
+    output_seg04 += '}\n\n\n'
     return output_seg04
 
 
@@ -133,13 +136,13 @@ def ldf_data_frame_def(df):
             start_bit = group_data['Lsb'].iloc[data_index]
             output_seg05 += f'    {signal_name}, {start_bit} ;\n'
         output_seg05 += '  }\n'
-    output_seg05 += '}\n'
+    output_seg05 += '}\n\n\n'
     return output_seg05
 
 
-##### fun(): output_seg06 [Diagnostic_frame] #####
+##### fun(): output_seg06 [Diagnostic_frames] #####
 def ldf_diag_frame(df):
-    output_seg06 = '\nDiagnostic_frame {\n'
+    output_seg06 = '\nDiagnostic_frames {\n'
     output_seg06 += '  MasterReq: 0x3c {\n'
     output_seg06 += '    MasterReqB0, 0 ;\n'
     output_seg06 += '    MasterReqB1, 8 ;\n'
@@ -168,16 +171,16 @@ def ldf_diag_frame(df):
 def ldf_node_attr(df):
     output_seg07 = '\nNode_attributes {\n'
     for slave_node in slave_node_list:
-        output_seg07 += f'  {slave_node} '
+        output_seg07 += f'  {slave_node}'
         output_seg07 += '{\n'
-        output_seg07 += '    LIN_protocol = "2.1" \n'
-        output_seg07 += '    configured_NAD = 0 \n'
-        output_seg07 += '    initial_NAD = 0x0 \n'
-        output_seg07 += '    product_id = 0xFFFF, 0xFFFF, 0xFFF \n'
-        output_seg07 += '    P2_min = 50 ms \n'
-        output_seg07 += '    ST_min = 0 ms \n'
-        output_seg07 += '    N_As_timeout = 1000 ms \n'
-        output_seg07 += '    N_Cr_timeout = 1000 ms \n'
+        output_seg07 += '    LIN_protocol = "2.1" ;\n'
+        output_seg07 += '    configured_NAD = 0 ;\n'
+        output_seg07 += '    initial_NAD = 0x0 ;\n'
+        output_seg07 += '    product_id = 0xFFFF, 0xFFFF, 0xFFF ;\n'
+        output_seg07 += '    P2_min = 50 ms ;\n'
+        output_seg07 += '    ST_min = 0 ms ;\n'
+        output_seg07 += '    N_As_timeout = 1000 ms ;\n'
+        output_seg07 += '    N_Cr_timeout = 1000 ms ;\n'
         output_seg07 += '    configurable_frames {\n'
 
         df_group = df.groupby('Message Name')
@@ -192,28 +195,86 @@ def ldf_node_attr(df):
 
         output_seg07 += '    }\n'
         output_seg07 += '  }\n'
-    output_seg07 += '  }\n'
+    output_seg07 += '}\n'
     return output_seg07
 
 
 ##### fun(): output_seg08 [Schedule_tables] #####
 def ldf_sch_table():
-    df_sch_table = pd.read_excel(excel_file, sheet_name='LIN_Schedule Table')
-    '''new_column = df_sch_table.iloc[1]
-    df_sch_table = df_sch_table.iloc[2:].rename(columns=new_column)
-    df_sch_table.reset_index(drop=True, inplace=True)'''
+    # load excel without column name (header=None)
+    df = pd.read_excel(excel_file, sheet_name='LIN_Schedule Table', header=None)
 
-    output_seg08 = '\nSchedule_tables {\n'
-    output_seg08 += ' Table1 {\n' # schedule table name
-    df_sch_table = df_sch_table.drop([0])
-    for index, row in df_sch_table.iterrows():
-        frame = row.iloc[3]
-        delay_time = row.iloc[2]
-        output_seg08 += f'    {frame} delay {delay_time} ms ;\n'
+    # add new column name
+    df.columns = ['No', 'Time', 'Delay', 'Message', 'Cycle', 'Comment']
+
+    table_name = 'CEM_LIN1 Schedule Table（IG_ON/IG_OFF）'
     
+    # dectect the starting row and endinf row of data
+    for index, row in df.iterrows():
+        data = row['No']
+        if table_name in str(row.iloc[0]):
+            start_index = index+2
+        if pd.isna(data):
+            end_index = index
+            break
+    
+    output_seg08 = '\nSchedule_tables {\n'
+    output_seg08 += ' Table1 {\n'
+    for index, row in df.iloc[start_index:end_index].iterrows():
+        frame_name = df['Message'].iloc[index]
+        delay_time = df['Delay'].iloc[index]
+        output_seg08 += f'    {frame_name} delay {delay_time} ms ;\n'
     output_seg08 += '  }\n'
     output_seg08 += '}\n'
     return output_seg08
+            
+
+##### fun(): output_seg09 [Signal_encoding_types] #####
+def ldf_sig_encode(df):
+    output_seg09 = '\nSignal_encoding_types {\n'
+    for index, row in df.iterrows():
+        signal_name = row['Signal Name']
+        minimum = row['P-Minimum']
+        maxmum = row['P-Maximum']
+        factor = row['Factor']
+        offect = row['Offset']
+        unit = row['Unit']
+        coding = row['Coding']
+
+        if not pd.isna(signal_name):
+            sig_encoding = 'Enc_' + signal_name
+            output_seg09 += f'  {sig_encoding} '
+            output_seg09 += '{\n'
+            output_seg09 += f'    physical_value, {minimum}, {maxmum}, {factor}, {offect}, "{unit}" ;\n'
+            
+            if not pd.isna(coding):
+                coding = coding.replace('=',':')
+                coding = coding.replace(' : ',':')
+                coding = coding.replace(' :',':')
+                coding = coding.replace(': ',':')
+                coding = coding.replace(' \n','\n')
+                coding_list = coding.split('\n')
+                for coding_data in coding_list:
+                    if '~' not in coding_data:
+                        coding_data_list = coding_data.split(':')
+                        value = coding_data_list[0]
+                        value = int(value, 16)
+                        description = coding_data_list[1]
+                        output_seg09 += f'    logical_value, {value}, "{description}" ;\n'
+            output_seg09 += '  }\n'
+    output_seg09 += '}\n'
+    return output_seg09
+
+
+##### fun(): output_seg10 [Signal_representation] #####
+def ldf_sig_represent(df):
+    output_seg10 = '\nSignal_representation {\n'
+    for index, row in df.iterrows():
+        signal_name = row['Signal Name']
+        if not pd.isna(signal_name):
+            output_seg10 += f'  Enc_{signal_name}: {signal_name} ;\n'
+    output_seg10 += '}\n'
+    return output_seg10
 
 
 
@@ -254,9 +315,11 @@ while True:
         output_05 = ldf_data_frame_def(df)
         output_06 = ldf_diag_frame(df)
         output_07 = ldf_node_attr(df)     
-        output_08 = ldf_sch_table()  
+        output_08 = ldf_sch_table()
+        output_09 = ldf_sig_encode(df)
+        output_10 = ldf_sig_represent(df)
         
-        output_text = output_01 + output_02 + output_03 + output_04 + output_05 + output_06 + output_07 + output_08
+        output_text = output_01 + output_02 + output_03 + output_04 + output_05 + output_06 + output_07 + output_08 + output_09 + output_10
         with open('testLDF.ldf', 'w', encoding='utf-8') as f:
             f.write(output_text)
         print('\nLDF is generated!!\n')
