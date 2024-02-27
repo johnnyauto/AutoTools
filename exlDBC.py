@@ -30,11 +30,11 @@ def sg_value(group_data, colName, dataIndex):
         pass
     return val
 
-##### fun(): generate DBC #####
-def gen_dbc(sheet_name, bus_type, il_support):
-    worksheet = workbook[sheet_name]
 
-    # Process Data (remove Empty and Strikethrough format data) 
+##### fun(): process data and generate data frame #####
+# this function will remove Empty and Strikethrough format data
+def process_data(workbook, sheet_name):
+    worksheet = workbook[sheet_name]
     pData = []      # processed Data
     Sig_index = 6   # column index of 'Signal Name'
     Msg_index = 10  # column index of 'Message Name'
@@ -58,9 +58,10 @@ def gen_dbc(sheet_name, bus_type, il_support):
     df = pd.DataFrame(pData, columns=columns)
     # convert 'Message ID' from Hex to Dec format
     df['Message ID'] = df['Message ID'].apply(lambda x: int(x, 16))
+    return df
 
-
-    ##### output_seg01 [VERSION | NS_] #####
+##### fun(): output_seg01 [VERSION | NS_ | BS_] #####
+def dbc_ver_ns_bs():
     # VERSION
     output_seg01 = 'VERSION ""\n\n\n'
 
@@ -76,10 +77,11 @@ def gen_dbc(sheet_name, bus_type, il_support):
 
     # BS_
     output_seg01 += 'BS_:\n\n'
+    return output_seg01
 
 
-    ##### output_seg02 [BU_] #####
-    # BU_
+##### fun(): output_seg02 [BU_] #####
+def dbc_bu(df):
     # BU_: {node_name_1} {node_name_2} ...
     output_seg02 = 'BU_: '
 
@@ -100,9 +102,11 @@ def gen_dbc(sheet_name, bus_type, il_support):
                 output_seg02 += f'{receiver_node_name} '               
 
     output_seg02 += '\n\n\n'
+    return output_seg02
 
 
-    ##### output_seg03 [BO_ | SG_] #####
+##### fun(): output_seg03 [BO_ | SG_] #####
+def dbc_bo_sg(df):
     # BO_ 
     output_seg03 =""
     df_group = df.groupby('Message Name')
@@ -184,9 +188,13 @@ def gen_dbc(sheet_name, bus_type, il_support):
             if dataIndex == len(group_data)-1:
                 output_seg03 += '\n'
     output_seg03 += '\n\n'
+    return output_seg03
 
 
-    ##### output_seg04 [BA_DEF_ | BA_DEF_DEF_] #####
+##### fun(): output_seg04 [BA_DEF_] #####
+def dbc_ba_def():
+    global ILSupport
+    global busType
     # BA_DEF_
     output_seg04 = ''
     output_seg04 += 'BA_DEF_  "BusType" STRING ;\n'
@@ -216,18 +224,20 @@ def gen_dbc(sheet_name, bus_type, il_support):
     output_seg04 += 'BA_DEF_DEF_  "GenMsgCycleTime" 100;\n'
     output_seg04 += 'BA_DEF_DEF_  "GenMsgSendType" "Cyclic";\n'
     output_seg04 += 'BA_DEF_DEF_  "GenMsgCycleTimeFast" 0;\n'
-    output_seg04 += f'BA_DEF_DEF_  "GenMsgILSupport" "{il_support}";\n'
+    output_seg04 += f'BA_DEF_DEF_  "GenMsgILSupport" "{ILSupport}";\n'
     output_seg04 += 'BA_DEF_DEF_  "GenMsgStartDelayTime" 0;\n'
     output_seg04 += 'BA_DEF_DEF_  "VFrameFormat" "StandardCAN";\n'
     output_seg04 += 'BA_DEF_DEF_  "NodeLayerModules" "CANoeILNLVector.dll";\n'
-    output_seg04 += f'BA_ "BusType" "{bus_type}";\n'
+    output_seg04 += f'BA_ "BusType" "{busType}";\n'
+    return output_seg04
 
-    ##### output_seg05 [BA_] & output_seg06 [VAL_] #####
+##### fun(): output_seg05 [BA_] & output_seg06 [VAL_] #####
+def dbc_ba(df):
     # BA_
     output_seg05 = ''
-    output_seg06 = ''
-
+    
     # get the first data of each group through group_index
+    df_group = df.groupby('Message Name')
     for group_index, group_data in df_group:
         message_id = group_data['Message ID'].iloc[0]
         message_type = group_data['Message Type'].iloc[0]
@@ -236,11 +246,11 @@ def gen_dbc(sheet_name, bus_type, il_support):
         # identify MsgSendType
         if message_type == 'P':
             MsgCycleTime = group_data['period\n(ms)'].iloc[0].astype(int)
-            output_seg04 += f'BA_ "GenMsgCycleTime" BO_ {message_id} {MsgCycleTime};\n'
+            output_seg05 += f'BA_ "GenMsgCycleTime" BO_ {message_id} {MsgCycleTime};\n'
         elif message_type == 'E' or message_type == 'M':
             # setup for "GenMsgSendType"
             MsgSendType = '8'   # NoMsgSendType
-            output_seg04 += f'BA_ "GenMsgSendType" BO_ {message_id} {MsgSendType};\n'
+            output_seg05 += f'BA_ "GenMsgSendType" BO_ {message_id} {MsgSendType};\n'
         else:
             pass
 
@@ -255,8 +265,17 @@ def gen_dbc(sheet_name, bus_type, il_support):
                 SigSendType = 1 # OnWrite
                 if not 'EMMC_BYTE_' in signal_name:
                     output_seg05 += f'BA_ "GenSigSendType" SG_ {message_id} {signal_name} {SigSendType};\n'
-                
+    return output_seg05
+
+
+##### fun(): output_seg06 [VAL_] #####
+def dbc_val(df):
     # VAL_
+    output_seg06 = ''
+    df_group = df.groupby('Message Name')
+    for group_index, group_data in df_group:
+        message_id = group_data['Message ID'].iloc[0]
+
         for dataIndex in range(len(group_data)):
             # A flag used to determine whether to generate a ValTable
             gen_ValTable = True
@@ -325,70 +344,82 @@ def gen_dbc(sheet_name, bus_type, il_support):
                 # if gen_ValTable is True, generates ValTable
                 if gen_ValTable:
                     output_seg06 += f'VAL_ {message_id} {signal_name} {Value_Description};\n'
+    return output_seg06
 
-
-    # create a DBC file
-    output_text = output_seg01 + output_seg02 + output_seg03 + output_seg04 + output_seg05 + output_seg06
-    DBC_name = sheet_name+'.dbc'
-    with open(DBC_name, 'w', encoding='utf-8') as f:
-        f.write(output_text)
-    print(f'\n{DBC_name} is generated!!\n')
-    input('Press [Enter] to continue.')
     
-
 ##### Main #####
-while True:
-    try:
-        # load Excel file
-        print('This program will generate DBC files from excel.\n')
-        excel_file = input('請輸入欲轉換的Excel檔名: ')
-        if not '.xlsx' in excel_file:
-            excel_file += '.xlsx'
-        workbook = openpyxl.load_workbook(excel_file, data_only=True)
-        break
-    except:
-        print('\nError! 檔名錯誤或找不到檔案路徑')
-        input('Press [Enter] to continue.\n')
-
-while True:
-    # get sheetName and sheet_index from workbook
-    sheet_name_list = workbook.sheetnames
-    print('\n\n[Sheet list]')
-    for index, sheetName in enumerate(sheet_name_list):
-        print(f'{index}: {sheetName}')
-    sheet_index = input("選擇一個sheet(輸入數字)生成DBC, 或輸入'q'結束程式: ")
-    if sheet_index.lower() == 'q':
-        break
-
-    # determine the BusType attribute
-    else:
-        print('\n\n[CAN bus types]\n1. CAN (default)\n2. CAN FD')
-        busType = input("選擇CAN bus類別(輸入數字), 或輸入'q'結束程式: ")
-        if busType == '2':
-            busType = 'CAN FD'
-        elif busType.lower() == 'q':
-            break
-        else:
-            busType = 'CAN'
-
-        # Determine the GenMsgILSupport attribute
-        print('\n\n[GenMsgILSupport]\n1. No (default)\n2. Yes')
-        print('(若啟用GenMsgILSupport, CANoe會根據Attribute定義自動發送CAN message.)')
-        ILSupport = input("選擇是否啟用GenMsgILSupport(輸入數字), 或輸入'q'結束程式:")
-        if ILSupport == '2':
-            ILSupport = 'Yes'
-        elif ILSupport.lower() == 'q':
-            break
-        else:
-            ILSupport = 'No'
-
-        # generate DBC files
+def dbc_main():
+    while True:
         try:
-            sheetName = sheet_name_list[int(sheet_index)]
-            gen_dbc(sheetName, busType, ILSupport)
+            # load Excel file
+            print('This program will generate DBC files from excel.\n')
+            excel_file = input('請輸入欲轉換的Excel檔名: ')
+            if not '.xlsx' in excel_file:
+                excel_file += '.xlsx'
+            workbook = openpyxl.load_workbook(excel_file, data_only=True)
+            break
         except:
-            print('\nError! 請確認所選擇的sheet內容是否正確')
+            print('\nError! 檔名錯誤或找不到檔案路徑')
             input('Press [Enter] to continue.\n')
+
+    while True:
+        # get sheetName and sheet_index from workbook
+        sheet_name_list = workbook.sheetnames
         
+        print('\n\n[Sheet list]')
+        for index, sheetName in enumerate(sheet_name_list):
+            print(f'{index}: {sheetName}')
+        sheet_index = input("請輸入數字選擇一個sheet生成DBC, 或輸入'q'結束程式: ")
+        if sheet_index.lower() == 'q':
+            break
 
+        # determine the BusType attribute
+        else:
+            global busType
+            global ILSupport
 
+            print('\n\n[CAN bus types]\n0. CAN\n1. CAN FD')
+            busType = input("請輸入數字選擇CAN bus類別, 或輸入'q'結束程式, 預設值為'0': ")
+            if busType == '1':
+                busType = 'CAN FD'
+            elif busType.lower() == 'q':
+                break
+            else:
+                busType = 'CAN'
+
+            # Determine the GenMsgILSupport attribute
+            print('\n\n[GenMsgILSupport]\n0. No\n1. Yes')
+            print('(若啟用GenMsgILSupport, CANoe會根據Attribute定義自動發送CAN message.)')
+            ILSupport = input("請輸入數字選擇是否啟用GenMsgILSupport, 或輸入'q'結束程式, 預設值為'0':")
+            if ILSupport == '1':
+                ILSupport = 'Yes'
+            elif ILSupport.lower() == 'q':
+                break
+            else:
+                ILSupport = 'No'
+
+            # generate DBC files          
+            try:
+                sheetName = sheet_name_list[int(sheet_index)]
+                df = process_data(workbook, sheetName)
+
+                output_01 = dbc_ver_ns_bs()
+                output_02 = dbc_bu(df)
+                output_03 = dbc_bo_sg(df)
+                output_04 = dbc_ba_def()
+                output_05 = dbc_ba(df)
+                output_06 = dbc_val(df)
+                
+                # create a DBC file
+                output_text = output_01 + output_02 + output_03 + output_04 + output_05 + output_06
+                DBC_name = sheetName+'.dbc'
+                with open(DBC_name, 'w', encoding='utf-8') as f:
+                    f.write(output_text)
+                print(f'\n{DBC_name} is generated!!\n')
+                input('Press [Enter] to continue.')
+            except:
+                print('\nError! 請確認所選擇的sheet內容是否正確')
+                input('Press [Enter] to continue.\n')
+            
+if __name__ == '__main__':
+    dbc_main()
