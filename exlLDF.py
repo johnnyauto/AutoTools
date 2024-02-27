@@ -2,10 +2,9 @@ import pandas as pd
 import openpyxl
 
 ##### fun(): process data and generate data frame #####
+# this function will remove Empty and Strikethrough format data
 def process_data(sheet_name):
     worksheet = workbook[sheet_name]
-
-    # Process Data (remove Empty and Strikethrough format data) 
     pData = []      # processed Data
     Sig_index = 6   # column index of 'Signal Name'
     Msg_index = 10  # column index of 'Message Name'
@@ -169,19 +168,27 @@ def ldf_diag_frame(df):
 
 ##### fun(): output_seg07 [Node_attributes] #####
 def ldf_node_attr(df):
+    config_nad = 1 # 1-255 (Hex/Dec)
+    init_nad = 1
+    supplier_id = '0x0' # 0-0x7FFE
+    finction_id = '0x0' # 0-0xFFFE
+    variant = '0x0' # 0-0xFF
     output_seg07 = '\nNode_attributes {\n'
     for slave_node in slave_node_list:
         output_seg07 += f'  {slave_node}'
         output_seg07 += '{\n'
         output_seg07 += '    LIN_protocol = "2.1" ;\n'
-        output_seg07 += '    configured_NAD = 0 ;\n'
-        output_seg07 += '    initial_NAD = 0x0 ;\n'
-        output_seg07 += '    product_id = 0xFFFF, 0xFFFF, 0xFFF ;\n'
+        output_seg07 += f'    configured_NAD = {config_nad} ;\n'
+        output_seg07 += f'    initial_NAD = {init_nad} ;\n'
+        output_seg07 += f'    product_id = {supplier_id}, {finction_id}, {variant} ;\n' # 
         output_seg07 += '    P2_min = 50 ms ;\n'
         output_seg07 += '    ST_min = 0 ms ;\n'
         output_seg07 += '    N_As_timeout = 1000 ms ;\n'
         output_seg07 += '    N_Cr_timeout = 1000 ms ;\n'
         output_seg07 += '    configurable_frames {\n'
+        # change NAD for next salve node, NAD should be unique
+        config_nad = config_nad + 1
+        init_nad = init_nad + 1
 
         df_group = df.groupby('Message Name')
         for group_index, group_data in df_group:
@@ -283,7 +290,7 @@ while True:
     try:
         # load Excel file
         print('This program will generate LDF files from excel.\n')
-        excel_file = input('請輸入欲轉換的Excel檔名: ')
+        excel_file = input("請輸入欲轉換的Excel檔名: ")
         if not '.xlsx' in excel_file:
             excel_file += '.xlsx'
         workbook = openpyxl.load_workbook(excel_file, data_only=True)
@@ -304,37 +311,29 @@ while True:
     if sheet_index.lower() == 'q':
         break
     else:
-        sheetName = sheet_name_list[int(sheet_index)]
-        # process data and generate df(data frame)
-        df = process_data(sheetName)
-        slave_node_list = []
-        output_01 = ldf_cfg(df)
-        output_02 = ldf_notes(df, slave_node_list)
-        output_03 = ldf_sig_def(df)
-        output_04 = ldf_diag_sig(df)
-        output_05 = ldf_data_frame_def(df)
-        output_06 = ldf_diag_frame(df)
-        output_07 = ldf_node_attr(df)     
-        output_08 = ldf_sch_table()
-        output_09 = ldf_sig_encode(df)
-        output_10 = ldf_sig_represent(df)
-        
-        output_text = output_01 + output_02 + output_03 + output_04 + output_05 + output_06 + output_07 + output_08 + output_09 + output_10
-        with open('testLDF.ldf', 'w', encoding='utf-8') as f:
-            f.write(output_text)
-        print('\nLDF is generated!!\n')
-        #print(slave_node_list)
-        input('Press [Enter] to continue.')
-        break
-
-        '''
-        # generate DBC files
         try:
             sheetName = sheet_name_list[int(sheet_index)]
             # process data and generate df(data frame)
             df = process_data(sheetName)
-            ldf_notes(df)
+            slave_node_list = []
+            output_01 = ldf_cfg(df)
+            output_02 = ldf_notes(df, slave_node_list)
+            output_03 = ldf_sig_def(df)
+            output_04 = ldf_diag_sig(df)
+            output_05 = ldf_data_frame_def(df)
+            output_06 = ldf_diag_frame(df)
+            output_07 = ldf_node_attr(df)     
+            output_08 = ldf_sch_table()
+            output_09 = ldf_sig_encode(df)
+            output_10 = ldf_sig_represent(df)
+            output_text = output_01 + output_02 + output_03 + output_04 + output_05 + output_06 + output_07 + output_08 + output_09 + output_10
+            with open('testLDF.ldf', 'w', encoding='utf-8') as f:
+                f.write(output_text)
+            print('\nLDF is generated!!\n')
+            #print(slave_node_list)
+            input('Press [Enter] to continue.')
             break
         except:
             print('\nError! 請確認所選擇的sheet內容是否正確')
-            input('Press [Enter] to continue.\n')'''
+            input('Press [Enter] to continue.\n')
+            
