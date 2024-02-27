@@ -1,9 +1,51 @@
 import pandas as pd
 import openpyxl
 
+##### fun(): LIN parameters #####
+def lin_para():
+    global version
+    global speed
+    global jitter_time
+    global timebase_time
+    while True:
+        print('\n\n[LIN bus參數設置]')
+        print(f'0: LIN protocol version: {version}')
+        print(f'1: LIN speed: {speed} kbps')
+        print(f'2: Jitter: {jitter_time} ms')
+        print(f'3: Timebase: {timebase_time} ms')
+        para_index = input("欲改參數請輸入選項數字進行修改, 如不需更改請按'Enter'繼續: ")
+
+        if para_index == '':
+            break
+        else:
+            match (para_index):
+                case '0':
+                    print(f'\nLIN protocol version 當前值為: {version}')
+                    new_val = input("請輸入新的參數值, 如不需更改請按'Enter'回上頁: ")
+                    if new_val != '':
+                        version = new_val
+                case '1':
+                    print(f'\nLIN speed 當前值為: {speed}')
+                    new_val = input("請輸入新的參數值, 如不需更改請按'Enter'回上頁: ")
+                    if new_val != '':
+                        speed = new_val
+                case '2':
+                    print(f'\nJitter 當前值為: {jitter_time}')
+                    new_val = input("請輸入新的參數值, 如不需更改請按'Enter'回上頁: ")
+                    if new_val != '':
+                        jitter_time = new_val
+                case '3':
+                    print(f'\nTimebase 當前值為: {timebase_time}')
+                    new_val = input("請輸入新的參數值, 如不需更改請按'Enter'回上頁: ")
+                    if new_val != '':
+                        timebase_time = new_val
+                case _:
+                    pass
+
+    
 ##### fun(): process data and generate data frame #####
 # this function will remove Empty and Strikethrough format data
-def process_data(sheet_name):
+def process_data(workbook, sheet_name):
     worksheet = workbook[sheet_name]
     pData = []      # processed Data
     Sig_index = 6   # column index of 'Signal Name'
@@ -34,17 +76,18 @@ def process_data(sheet_name):
 ##### fun(): output_seg01 [LDF config] #####
 def ldf_cfg(df):
     output_seg01 = '\n\nLIN_description_file;\n'
-    output_seg01 += 'LIN_protocol_version = "2.1";\n'
-    output_seg01 += 'LIN_language_version = "2.1";\n'
-    output_seg01 += 'LIN_speed = 19.2 kbps;\n'
+    output_seg01 += f'LIN_protocol_version = "{version}";\n'
+    output_seg01 += f'LIN_language_version = "{version}";\n'
+    output_seg01 += f'LIN_speed = {speed} kbps;\n'
     return output_seg01
 
 
 ##### fun(): output_seg02 [Nodes] #####
-def ldf_notes(df, slave_node_list):
+def ldf_notes(df):
+    global slave_node_list
     notes_list = []
-    time_base = '10'
-    jitter = '0.1'
+    #time_base = '10'
+    #jitter = '0.1'
 
     # add node_name from 'Transmitter'
     df_group_tx = df.groupby('Transmitter')
@@ -55,10 +98,13 @@ def ldf_notes(df, slave_node_list):
     # remove duplite data for notes_list
     notes_list = list(set(notes_list))
     notes_list.sort()
+    print('\n\n[Node List]')
     for index, node in enumerate(notes_list):
         print(f'{index}: {node}')
 
-    index = input('請選擇一個Node作為Master node: ')
+    index = input("請輸入數字選擇一個Node作為Master node, 預設值:'0': ")
+    if index == '':
+        index = '0'
     master_node = notes_list[int(index)]
 
     slave_nodes = ''
@@ -69,7 +115,7 @@ def ldf_notes(df, slave_node_list):
     slave_nodes = slave_nodes[:-2]
 
     output_seg02 = '\nNodes {\n'
-    output_seg02 += f'  Master: {master_node}, {time_base} ms, {jitter} ms ;\n'
+    output_seg02 += f'  Master: {master_node}, {timebase_time} ms, {jitter_time} ms ;\n'
     output_seg02 += f'  Slaves: {slave_nodes} ;\n'
     output_seg02 += '}\n'
     return output_seg02
@@ -168,6 +214,7 @@ def ldf_diag_frame(df):
 
 ##### fun(): output_seg07 [Node_attributes] #####
 def ldf_node_attr(df):
+    global slave_node_list
     config_nad = 1 # 1-255 (Hex/Dec)
     init_nad = 1
     supplier_id = '0x0' # 0-0x7FFE
@@ -177,7 +224,7 @@ def ldf_node_attr(df):
     for slave_node in slave_node_list:
         output_seg07 += f'  {slave_node}'
         output_seg07 += '{\n'
-        output_seg07 += '    LIN_protocol = "2.1" ;\n'
+        output_seg07 += f'    LIN_protocol = "{version}" ;\n'
         output_seg07 += f'    configured_NAD = {config_nad} ;\n'
         output_seg07 += f'    initial_NAD = {init_nad} ;\n'
         output_seg07 += f'    product_id = {supplier_id}, {finction_id}, {variant} ;\n' # 
@@ -207,24 +254,45 @@ def ldf_node_attr(df):
 
 
 ##### fun(): output_seg08 [Schedule_tables] #####
-def ldf_sch_table():
+def ldf_sch_table(excel_file):
     # load excel without column name (header=None)
     df = pd.read_excel(excel_file, sheet_name='LIN_Schedule Table', header=None)
 
     # add new column name
     df.columns = ['No', 'Time', 'Delay', 'Message', 'Cycle', 'Comment']
+   
+    # search schedule table in sheet 'LIN_Schedule Table'
+    table_list = []
+    for index, row in df.iterrows():
+        text = str(row.iloc[0]).lower()
+        if 'schedule table' in text or 'schedule_table' in text:
+            table_list.append(row.iloc[0])
+            #print(row.iloc[0])
+    
+    print('\n\n[Schedule table list]')
+    for index, tableName in enumerate(table_list):
+        print(f'{index}: {tableName}')
+    table_index = input("請輸入數字選擇一個Schedule Table (若Schedule Table不正確會導致LDF不可用), 預設值為'0': ")
+    if table_index == '':
+        table_index = '0'
+    selected_table = table_list[int(table_index)]
 
-    table_name = 'CEM_LIN1 Schedule Table（IG_ON/IG_OFF）'
+    #selected_table = 'CEM_LIN1 Schedule Table（IG_ON/IG_OFF）'
     
     # dectect the starting row and endinf row of data
+    table_found = False
+    # due to the last row is not empty, add a empty row at button of the df for end_index
+    df.loc[len(df)] = pd.Series()
+
     for index, row in df.iterrows():
-        data = row['No']
-        if table_name in str(row.iloc[0]):
+        data = row['Message']
+        if selected_table in str(row.iloc[0]):
             start_index = index+2
-        if pd.isna(data):
+            table_found = True
+        if table_found and index > start_index and pd.isna(data):
             end_index = index
             break
-    
+
     output_seg08 = '\nSchedule_tables {\n'
     output_seg08 += ' Table1 {\n'
     for index, row in df.iloc[start_index:end_index].iterrows():
@@ -286,54 +354,108 @@ def ldf_sig_represent(df):
 
 
 ##### Main #####
-while True:
-    try:
-        # load Excel file
-        print('This program will generate LDF files from excel.\n')
-        excel_file = input("請輸入欲轉換的Excel檔名: ")
-        if not '.xlsx' in excel_file:
-            excel_file += '.xlsx'
-        workbook = openpyxl.load_workbook(excel_file, data_only=True)
-        break
-    except:
-        print('\nError! 檔名錯誤或找不到檔案路徑')
-        input('Press [Enter] to continue.\n')
-
-while True:
-    # get sheetName and sheet_index from workbook
-    sheet_name_list = workbook.sheetnames
-    print('\n\n[Sheet list]')
-    for index, sheetName in enumerate(sheet_name_list):
-        print(f'{index}: {sheetName}')
-
-    sheet_index = input("選擇一個sheet(輸入數字)生成LDF, 或輸入'q'結束程式: ")
-    
-    if sheet_index.lower() == 'q':
-        break
-    else:
+def ldf_main():
+    while True:
         try:
-            sheetName = sheet_name_list[int(sheet_index)]
-            # process data and generate df(data frame)
-            df = process_data(sheetName)
-            slave_node_list = []
-            output_01 = ldf_cfg(df)
-            output_02 = ldf_notes(df, slave_node_list)
-            output_03 = ldf_sig_def(df)
-            output_04 = ldf_diag_sig(df)
-            output_05 = ldf_data_frame_def(df)
-            output_06 = ldf_diag_frame(df)
-            output_07 = ldf_node_attr(df)     
-            output_08 = ldf_sch_table()
-            output_09 = ldf_sig_encode(df)
-            output_10 = ldf_sig_represent(df)
-            output_text = output_01 + output_02 + output_03 + output_04 + output_05 + output_06 + output_07 + output_08 + output_09 + output_10
-            with open('testLDF.ldf', 'w', encoding='utf-8') as f:
-                f.write(output_text)
-            print('\nLDF is generated!!\n')
-            #print(slave_node_list)
-            input('Press [Enter] to continue.')
+            # load Excel file
+            print('This program will generate LDF files from excel.\n')
+            excel_file = input("請輸入欲轉換的Excel檔名: ")
+            if not '.xlsx' in excel_file:
+                excel_file += '.xlsx'
+            workbook = openpyxl.load_workbook(excel_file, data_only=True)
             break
         except:
-            print('\nError! 請確認所選擇的sheet內容是否正確')
+            print('\nError! 檔名錯誤或找不到檔案路徑')
             input('Press [Enter] to continue.\n')
-            
+
+    while True:
+        # get sheetName and sheet_index from workbook
+        sheet_name_list = workbook.sheetnames
+        print('\n\n[Sheet list]')
+        for index, sheetName in enumerate(sheet_name_list):
+            print(f'{index}: {sheetName}')
+
+        sheet_index = input("請輸入數字選擇一個sheet生成LDF, 或輸入'q'結束程式: ")
+        
+        if sheet_index.lower() == 'q':
+            break
+        else:
+            try:
+                sheetName = sheet_name_list[int(sheet_index)]
+                # process data and generate df(data frame)
+                df = process_data(workbook, sheetName)
+                
+                # declare variable for LIN bus config
+                global version
+                global speed
+                global jitter_time
+                global timebase_time
+                version = '2.1'
+                speed = '19.2'
+                jitter_time = '0.1'
+                timebase_time ='10'
+                # declare slave_node_list for ldf_notes() and ldf_node_attr()
+                global slave_node_list
+                slave_node_list = []
+
+                # setup LIN bus parameter
+                lin_para()
+
+                output_01 = ldf_cfg(df)
+                output_02 = ldf_notes(df)
+                output_03 = ldf_sig_def(df)
+                output_04 = ldf_diag_sig(df)
+                output_05 = ldf_data_frame_def(df)
+                output_06 = ldf_diag_frame(df)
+                output_07 = ldf_node_attr(df)     
+                output_08 = ldf_sch_table(excel_file)
+                output_09 = ldf_sig_encode(df)
+                output_10 = ldf_sig_represent(df)
+                output_text = output_01 + output_02 + output_03 + output_04 + output_05 + output_06 + output_07 + output_08 + output_09 + output_10
+                with open('testLDF.ldf', 'w', encoding='utf-8') as f:
+                    f.write(output_text)
+                print('\nLDF is generated!!\n')
+                input('Press [Enter] to continue.')
+            except:
+                print('\nError! 請確認所選擇的sheet內容是否正確')
+                input('Press [Enter] to continue.\n')
+        
+        '''sheetName = sheet_name_list[int(sheet_index)]
+        # process data and generate df(data frame)
+        df = process_data(workbook, sheetName)
+        
+        # declare variable for LIN bus config
+        global version
+        global speed
+        global jitter_time
+        global timebase_time
+        version = '2.1'
+        speed = '19.2'
+        jitter_time = '0.1'
+        timebase_time ='10'
+        # declare slave_node_list for ldf_notes() and ldf_node_attr()
+        global slave_node_list
+        slave_node_list = []
+
+        # setup LIN bus parameter
+        lin_para()
+
+        output_01 = ldf_cfg(df)
+        output_02 = ldf_notes(df)
+        output_03 = ldf_sig_def(df)
+        output_04 = ldf_diag_sig(df)
+        output_05 = ldf_data_frame_def(df)
+        output_06 = ldf_diag_frame(df)
+        output_07 = ldf_node_attr(df)     
+        output_08 = ldf_sch_table(excel_file)
+        output_09 = ldf_sig_encode(df)
+        output_10 = ldf_sig_represent(df)
+        output_text = output_01 + output_02 + output_03 + output_04 + output_05 + output_06 + output_07 + output_08 + output_09 + output_10
+        with open('testLDF.ldf', 'w', encoding='utf-8') as f:
+            f.write(output_text)
+        print('\nLDF is generated!!\n')
+        #print(slave_node_list)
+        input('Press [Enter] to continue.')'''
+
+if __name__ == "__main__":
+    ldf_main()
