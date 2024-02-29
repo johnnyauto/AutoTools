@@ -352,7 +352,7 @@ def dbc_main():
     while True:
         try:
             # load Excel file
-            print('This program will generate DBC files from excel.\n')
+            print('\nThis program will generate a DBC file from excel.\n')
             excel_file = input('請輸入欲轉換的Excel檔名: ')
             if not '.xlsx' in excel_file:
                 excel_file += '.xlsx'

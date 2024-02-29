@@ -13,29 +13,29 @@ def lin_para():
         print(f'1: LIN speed: {speed} kbps')
         print(f'2: Jitter: {jitter_time} ms')
         print(f'3: Timebase: {timebase_time} ms')
-        para_index = input("欲改參數請輸入選項數字進行修改, 如不需更改請按'Enter'繼續: ")
+        para_index = input("如需修改參數請輸入選項數字進行變更, 不需修改請按'Enter'繼續: ")
 
         if para_index == '':
             break
         else:
             match (para_index):
                 case '0':
-                    print(f'\nLIN protocol version 當前值為: {version}')
+                    print(f'\n\nLIN protocol version 當前值為: {version}')
                     new_val = input("請輸入新的參數值, 如不需更改請按'Enter'回上頁: ")
                     if new_val != '':
                         version = new_val
                 case '1':
-                    print(f'\nLIN speed 當前值為: {speed}')
+                    print(f'\n\nLIN speed 當前值為: {speed}')
                     new_val = input("請輸入新的參數值, 如不需更改請按'Enter'回上頁: ")
                     if new_val != '':
                         speed = new_val
                 case '2':
-                    print(f'\nJitter 當前值為: {jitter_time}')
+                    print(f'\n\nJitter 當前值為: {jitter_time}')
                     new_val = input("請輸入新的參數值, 如不需更改請按'Enter'回上頁: ")
                     if new_val != '':
                         jitter_time = new_val
                 case '3':
-                    print(f'\nTimebase 當前值為: {timebase_time}')
+                    print(f'\n\nTimebase 當前值為: {timebase_time}')
                     new_val = input("請輸入新的參數值, 如不需更改請按'Enter'回上頁: ")
                     if new_val != '':
                         timebase_time = new_val
@@ -358,7 +358,7 @@ def ldf_main():
     while True:
         try:
             # load Excel file
-            print('This program will generate LDF files from excel.\n')
+            print('\nThis program will generate a LDF file from excel.\n')
             excel_file = input("請輸入欲轉換的Excel檔名: ")
             if not '.xlsx' in excel_file:
                 excel_file += '.xlsx'
@@ -412,9 +412,11 @@ def ldf_main():
                 output_09 = ldf_sig_encode(df)
                 output_10 = ldf_sig_represent(df)
                 output_text = output_01 + output_02 + output_03 + output_04 + output_05 + output_06 + output_07 + output_08 + output_09 + output_10
-                with open('testLDF.ldf', 'w', encoding='utf-8') as f:
+
+                LDF_name = sheetName + '.ldf'
+                with open(LDF_name, 'w', encoding='utf-8') as f:
                     f.write(output_text)
-                print('\nLDF is generated!!\n')
+                print(f'\n{LDF_name} is generated!!\n')
                 input('Press [Enter] to continue.')
             except:
                 print('\nError! 請確認所選擇的sheet內容是否正確')
