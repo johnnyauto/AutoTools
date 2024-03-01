@@ -25,8 +25,8 @@ def lin_para():
                     if new_val != '':
                         version = new_val
                 case '1':
-                    print(f'\n\nLIN speed 當前值為: {speed}')
-                    new_val = input("請輸入新的參數值, 如不需更改請按'Enter'回上頁: ")
+                    print(f'\n\nLIN speed 當前值為: {speed} kbps')
+                    new_val = input("請輸入新的參數值(輸入數字, 單位為kbps), 如不需更改請按'Enter'回上頁: ")
                     if new_val != '':
                         speed = new_val
                 case '2':
@@ -49,13 +49,12 @@ def process_data(workbook, sheet_name):
     worksheet = workbook[sheet_name]
     pData = []      # processed Data
     Sig_index = 3   # column index of 'Signal Name'
-    Msg_index = 10  # column index of 'Message Name'
+    Msg_index = 1  # column index of 'Msg Name'
    
 
     # for row_index in worksheet.iter_rows(values_only=True):
     for row_index in range(2, worksheet.max_row+1):
         Msg_value = worksheet.cell(row=row_index, column=Msg_index).value
-
         Msg_strike = worksheet.cell(row=row_index, column=Msg_index).font.strike
         Sig_strike = worksheet.cell(row=row_index, column=Sig_index).font.strike
 
@@ -68,8 +67,8 @@ def process_data(workbook, sheet_name):
 
     # convert pData to DataFrame
     df = pd.DataFrame(pData, columns=columns)
-    # convert 'Message ID' from Hex to Dec format
-    df['Message ID'] = df['Message ID'].apply(lambda x: int(x, 16))
+    # convert 'Identifier' from Hex to Dec format
+    df['Identifier'] = df['Identifier'].apply(lambda x: int(x, 16))
     return df
 
 
@@ -86,21 +85,22 @@ def ldf_cfg(df):
 def ldf_notes(df):
     global slave_node_list
     notes_list = []
+    Publisher_list = []
+    Receiver_list = []
 
-
-    # add node_name from 'Transmitter'
-    df_group_tx = df.groupby('Publisher')
-    df_group_rx = df.groupby('Receiver')
-    Transmitter = list(df_group_tx.groups.keys())
-    Receiver = list(df_group_rx.groups.keys())
-    notes_list = Transmitter + Receiver
-
-    #========= new codes ============
-
-    #========= new codes end ============
-
-    # remove duplite data for notes_list
-    notes_list = list(set(notes_list))
+    for index, row in df.iterrows():
+        Publisher = row['Publisher']
+        Receiver = row['Receiver']
+        if Publisher not in Publisher_list:
+            Publisher_list.append(Publisher)
+        
+        Receiver_split = Receiver.split('\n') # The Receiver may have mutiple rx-nodes
+        for node in Receiver_split:
+            if node not in Receiver_list:
+                Receiver_list.append(node)
+    notes_list = Publisher_list + Receiver_list
+    
+    notes_list = list(set(notes_list)) # remove duplite data for notes_list
     notes_list.sort()
     print('\n\n[Node List]')
     for index, node in enumerate(notes_list):
@@ -130,13 +130,13 @@ def ldf_sig_def(df):
     output_seg03 = '\nSignals {\n'
     for index, row in df.iterrows():
         signal_name = row['Signal Name']
-        size_bit = int(row['size(bit)'])
-        init_val = row['Default Initialised value']
+        size_bit = int(row['Data length [bits]'])
+        init_val = row['Initial value [dez]']
         if '0x' in str(init_val):
             init_val = pd.Series(init_val).apply(lambda x: int(x, 16)) # .apply() only for DataFrame
             init_val = init_val.values # init_val become a list[] with a element
             init_val = init_val[0] # get the value for the list
-        tx_node = row['Transmitter']
+        tx_node = row['Publisher']
         rx_node = row['Receiver']
         if '\n' in rx_node:
             rx_node = rx_node.replace('\n',', ')
@@ -172,17 +172,17 @@ def ldf_diag_sig(df):
 ##### fun(): output_seg05 [Frames] #####
 def ldf_data_frame_def(df):
     output_seg05 = '\nFrames {\n'
-    df_group = df.groupby('Message Name')
+    df_group = df.groupby('Msg Name')
     for group_index, group_data in df_group:
-        frame_name = group_data['Message Name'].iloc[0]
-        frame_id = group_data['Message ID'].iloc[0]
-        tx_node = group_data['Transmitter'].iloc[0]
+        frame_name = group_data['Msg Name'].iloc[0]
+        frame_id = group_data['Identifier'].iloc[0]
+        tx_node = group_data['Publisher'].iloc[0]
         frame_size = group_data['DLC'].iloc[0]
         output_seg05 += f'  {frame_name}: {frame_id}, {tx_node}, {frame_size} '
         output_seg05 += '{\n'
         for data_index in range(len(group_data)):
             signal_name = group_data['Signal Name'].iloc[data_index]
-            start_bit = group_data['Lsb'].iloc[data_index]
+            start_bit = group_data['Start bit'].iloc[data_index]
             output_seg05 += f'    {signal_name}, {start_bit} ;\n'
         output_seg05 += '  }\n'
     output_seg05 += '}\n\n\n'
@@ -241,12 +241,12 @@ def ldf_node_attr(df):
         config_nad = config_nad + 1
         init_nad = init_nad + 1
 
-        df_group = df.groupby('Message Name')
+        df_group = df.groupby('Msg Name')
         for group_index, group_data in df_group:
-            frame = group_data['Message Name'].iloc[0]
-            tx_node = group_data['Transmitter'].iloc[0]
+            frame = group_data['Msg Name'].iloc[0]
+            tx_node = group_data['Publisher'].iloc[0]
             rx_node_list = group_data['Receiver'].iloc[0].split('\n')
-            # check whether the slave node is related to the Transmitter or Receiver of the message
+            # check whether the slave node is related to the Publisher or Receiver of the message
             # if so, the message belongs configurable_frames
             if slave_node == tx_node or slave_node in rx_node_list:
                 output_seg07 += f'      {frame} ;\n'
@@ -260,10 +260,10 @@ def ldf_node_attr(df):
 ##### fun(): output_seg08 [Schedule_tables] #####
 def ldf_sch_table(excel_file):
     # load excel without column name (header=None)
-    df = pd.read_excel(excel_file, sheet_name='LIN_Schedule Table', header=None)
+    df = pd.read_excel(excel_file, sheet_name='Schedule Table', header=None)
 
     # add new column name
-    df.columns = ['No', 'Time', 'Delay', 'Message', 'Cycle', 'Comment']
+    df.columns = ['No', 'Delay', 'Message', 'Comment']
    
     # search schedule table in sheet 'LIN_Schedule Table'
     table_list = []
@@ -280,9 +280,7 @@ def ldf_sch_table(excel_file):
     if table_index == '':
         table_index = '0'
     selected_table = table_list[int(table_index)]
-
-    #selected_table = 'CEM_LIN1 Schedule Table（IG_ON/IG_OFF）'
-    
+   
     # dectect the starting row and endinf row of data
     table_found = False
     # due to the last row is not empty, add a empty row at button of the df for end_index
@@ -313,19 +311,19 @@ def ldf_sig_encode(df):
     output_seg09 = '\nSignal_encoding_types {\n'
     for index, row in df.iterrows():
         signal_name = row['Signal Name']
-        minimum = row['P-Minimum']
-        maxmum = row['P-Maximum']
+        minimum = row['Minimum (phys)']
+        maxmum = row['Maximum (phys)']
         factor = row['Factor']
         offect = row['Offset']
-        unit = row['Unit']
-        coding = row['Coding']
+        #unit = row['Unit']
+        #coding = row['Logical Encoding']
 
         if not pd.isna(signal_name):
             sig_encoding = 'Enc_' + signal_name
             output_seg09 += f'  {sig_encoding} '
             output_seg09 += '{\n'
-            output_seg09 += f'    physical_value, {minimum}, {maxmum}, {factor}, {offect}, "{unit}" ;\n'
-            
+            output_seg09 += f'    physical_value, {minimum}, {maxmum}, {factor}, {offect} ;\n' # without Unit
+            r'''
             if not pd.isna(coding):
                 coding = coding.replace('=',':')
                 coding = coding.replace(' : ',':')
@@ -340,6 +338,7 @@ def ldf_sig_encode(df):
                         value = int(value, 16)
                         description = coding_data_list[1]
                         output_seg09 += f'    logical_value, {value}, "{description}" ;\n'
+            '''
             output_seg09 += '  }\n'
     output_seg09 += '}\n'
     return output_seg09
@@ -354,7 +353,6 @@ def ldf_sig_represent(df):
             output_seg10 += f'  Enc_{signal_name}: {signal_name} ;\n'
     output_seg10 += '}\n'
     return output_seg10
-
 
 
 ##### Main #####
@@ -383,11 +381,10 @@ def ldf_main():
         
         if sheet_index.lower() == 'q':
             break
-        '''else:
+        else:
             try:
                 sheetName = sheet_name_list[int(sheet_index)]
-                # process data and generate df(data frame)
-                df = process_data(workbook, sheetName)
+                df = process_data(workbook, sheetName) # process data and generate df(data frame)
                 
                 # declare variable for LIN bus config
                 global version
@@ -420,48 +417,11 @@ def ldf_main():
                 LDF_name = sheetName + '.ldf'
                 with open(LDF_name, 'w', encoding='utf-8') as f:
                     f.write(output_text)
-                print(f'\n{LDF_name} is generated!!\n')
+                print('\nLDF is generated!!\n')
                 input('Press [Enter] to continue.')
             except:
                 print('\nError! 請確認所選擇的sheet內容是否正確')
-                input('Press [Enter] to continue.\n')'''
-        
-        sheetName = sheet_name_list[int(sheet_index)]
-        # process data and generate df(data frame)
-        df = process_data(workbook, sheetName)
-        
-        # declare variable for LIN bus config
-        global version
-        global speed
-        global jitter_time
-        global timebase_time
-        version = '2.1'
-        speed = '19.2'
-        jitter_time = '0.1'
-        timebase_time ='10'
-        # declare slave_node_list for ldf_notes() and ldf_node_attr()
-        global slave_node_list
-        slave_node_list = []
-
-        # setup LIN bus parameter
-        lin_para()
-
-        output_01 = ldf_cfg(df)
-        output_02 = ldf_notes(df)
-        output_03 = ldf_sig_def(df)
-        output_04 = ldf_diag_sig(df)
-        output_05 = ldf_data_frame_def(df)
-        output_06 = ldf_diag_frame(df)
-        output_07 = ldf_node_attr(df)     
-        output_08 = ldf_sch_table(excel_file)
-        output_09 = ldf_sig_encode(df)
-        output_10 = ldf_sig_represent(df)
-        output_text = output_01 + output_02 + output_03 + output_04 + output_05 + output_06 + output_07 + output_08 + output_09 + output_10
-        with open('testLDF.ldf', 'w', encoding='utf-8') as f:
-            f.write(output_text)
-        print('\nLDF is generated!!\n')
-        #print(slave_node_list)
-        input('Press [Enter] to continue.')
+                input('Press [Enter] to continue.\n')
 
 if __name__ == "__main__":
     ldf_main()

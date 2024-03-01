@@ -25,8 +25,8 @@ def lin_para():
                     if new_val != '':
                         version = new_val
                 case '1':
-                    print(f'\n\nLIN speed 當前值為: {speed}')
-                    new_val = input("請輸入新的參數值, 如不需更改請按'Enter'回上頁: ")
+                    print(f'\n\nLIN speed 當前值為: {speed} kbps')
+                    new_val = input("請輸入新的參數值(輸入數字, 單位為kbps), 如不需更改請按'Enter'回上頁: ")
                     if new_val != '':
                         speed = new_val
                 case '2':
@@ -86,17 +86,22 @@ def ldf_cfg(df):
 def ldf_notes(df):
     global slave_node_list
     notes_list = []
-    #time_base = '10'
-    #jitter = '0.1'
+    Transmitter_list = []
+    Receiver_list = []
 
-    # add node_name from 'Transmitter'
-    df_group_tx = df.groupby('Transmitter')
-    df_group_rx = df.groupby('Receiver')
-    Transmitter = list(df_group_tx.groups.keys())
-    Receiver = list(df_group_rx.groups.keys())
-    notes_list = Transmitter + Receiver
-    # remove duplite data for notes_list
-    notes_list = list(set(notes_list))
+    for index, row in df.iterrows():
+        Transmitter = row['Transmitter']
+        Receiver = row['Receiver']
+        if Transmitter not in Transmitter_list:
+            Transmitter_list.append(Transmitter)
+        
+        Receiver_split = Receiver.split('\n') # The Receiver may have mutiple rx-nodes
+        for node in Receiver_split:
+            if node not in Receiver_list:
+                Receiver_list.append(node)
+    notes_list = Transmitter_list + Receiver_list
+    
+    notes_list = list(set(notes_list)) # remove duplite data for notes_list
     notes_list.sort()
     print('\n\n[Node List]')
     for index, node in enumerate(notes_list):
@@ -129,9 +134,7 @@ def ldf_sig_def(df):
         size_bit = int(row['size(bit)'])
         init_val = row['Default Initialised value']
         if '0x' in str(init_val):
-            init_val = pd.Series(init_val).apply(lambda x: int(x, 16)) # .apply() only for DataFrame
-            init_val = init_val.values # init_val become a list[] with a element
-            init_val = init_val[0] # get the value for the list
+            init_val = int(row['Default Initialised value'], 16)
         tx_node = row['Transmitter']
         rx_node = row['Receiver']
         if '\n' in rx_node:
@@ -453,7 +456,8 @@ def ldf_main():
         output_09 = ldf_sig_encode(df)
         output_10 = ldf_sig_represent(df)
         output_text = output_01 + output_02 + output_03 + output_04 + output_05 + output_06 + output_07 + output_08 + output_09 + output_10
-        with open('testLDF.ldf', 'w', encoding='utf-8') as f:
+        LDF_name = sheetName + '.ldf'
+        with open(LDF_name, 'w', encoding='utf-8') as f:
             f.write(output_text)
         print('\nLDF is generated!!\n')
         #print(slave_node_list)
