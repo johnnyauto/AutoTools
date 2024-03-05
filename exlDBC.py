@@ -47,7 +47,7 @@ def process_data(workbook, sheet_name):
         Msg_strike = worksheet.cell(row=row_index, column=Msg_index).font.strike
         Sig_strike = worksheet.cell(row=row_index, column=Sig_index).font.strike
 
-        if Msg_value and Mab_value and not Msg_strike and not Sig_strike:
+        if Msg_value and Mab_value != None and not Msg_strike and not Sig_strike:
             # generate a processed Data
             pData.append([worksheet.cell(row=row_index, column=col).value for col in range(1, worksheet.max_column + 1)])
 
@@ -398,8 +398,25 @@ def dbc_main():
             else:
                 ILSupport = 'No'
 
-            # generate DBC files          
-            try:
+            # generate DBC files
+            sheetName = sheet_name_list[int(sheet_index)]
+            df = process_data(workbook, sheetName)
+
+            output_01 = dbc_ver_ns_bs()
+            output_02 = dbc_bu(df)
+            output_03 = dbc_bo_sg(df)
+            output_04 = dbc_ba_def()
+            output_05 = dbc_ba(df)
+            output_06 = dbc_val(df)
+            
+            # create a DBC file
+            output_text = output_01 + output_02 + output_03 + output_04 + output_05 + output_06
+            DBC_name = sheetName+'.dbc'
+            with open(DBC_name, 'w', encoding='utf-8') as f:
+                f.write(output_text)
+            print(f'\n{DBC_name} is generated!!\n')
+            input('Press [Enter] to continue.')
+            '''try:
                 sheetName = sheet_name_list[int(sheet_index)]
                 df = process_data(workbook, sheetName)
 
@@ -419,7 +436,7 @@ def dbc_main():
                 input('Press [Enter] to continue.')
             except:
                 print('\nError! 請確認所選擇的sheet內容是否正確')
-                input('Press [Enter] to continue.\n')
+                input('Press [Enter] to continue.\n')'''
             
 if __name__ == '__main__':
     dbc_main()
