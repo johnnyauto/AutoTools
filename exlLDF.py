@@ -59,8 +59,8 @@ def process_data(workbook, sheet_name):
         Msg_strike = worksheet.cell(row=row_index, column=Msg_index).font.strike
         Sig_strike = worksheet.cell(row=row_index, column=Sig_index).font.strike
 
-        if Msg_value and Msb_value and not Msg_strike and not Sig_strike:
-            # generate a processed Data
+        # generate a processed Data
+        if Msg_value and Msb_value != None and not Msg_strike and not Sig_strike:
             pData.append([worksheet.cell(row=row_index, column=col).value for col in range(1, worksheet.max_column + 1)])
 
     # get column name
