@@ -248,10 +248,20 @@ def dbc_ba(df):
         if message_type == 'P':
             MsgCycleTime = group_data['period\n(ms)'].iloc[0].astype(int)
             output_seg05 += f'BA_ "GenMsgCycleTime" BO_ {message_id} {MsgCycleTime};\n'
+        # set "GenMsgSendType" to NoMsgSendType
         elif message_type == 'E' or message_type == 'M':
-            # setup for "GenMsgSendType"
             MsgSendType = '8'   # NoMsgSendType
             output_seg05 += f'BA_ "GenMsgSendType" BO_ {message_id} {MsgSendType};\n'
+            
+            # set 'GenSigSendType' to OnWrite
+            for dataIndex in range(len(group_data)):
+                signal_name = group_data['Signal Name'].iloc[dataIndex]
+                signal_name = chk_signalname(signal_name)
+                signal_type = group_data['Signal Type'].iloc[dataIndex]
+                signal_type = signal_type.upper()
+                SigSendType = 1 # OnWrite
+                if (signal_type == 'M' or signal_type == 'E') and not 'EMMC_BYTE_' in signal_name:
+                    output_seg05 += f'BA_ "GenSigSendType" SG_ {message_id} {signal_name} {SigSendType};\n'
         else:
             pass
 
@@ -259,12 +269,16 @@ def dbc_ba(df):
         if message_size > 8:
             VFrameFormat = '14'   #StandardCAN_FD
             output_seg05 += f'BA_ "VFrameFormat" BO_ {message_id} {VFrameFormat};\n'
-        
-            for dataIndex in range(len(group_data)):
-                signal_name = group_data['Signal Name'].iloc[dataIndex]
-                signal_name = chk_signalname(signal_name)
-                SigSendType = 1 # OnWrite
-                if not 'EMMC_BYTE_' in signal_name:
+            
+            # special cases, against to EMMC_BYTE_# signals
+            SigSendType = 1 # OnWrite
+            if message_id == 1045: # 0x415 (BCM40)
+                for number in range(0, 64):
+                    signal_name = f'EMMC_BYTE_{number}'
+                    output_seg05 += f'BA_ "GenSigSendType" SG_ {message_id} {signal_name} {SigSendType};\n'
+            if message_id == 1046: # 0x416 (BCM41)
+                for number in range(64, 128):
+                    signal_name = f'EMMC_BYTE_{number}'
                     output_seg05 += f'BA_ "GenSigSendType" SG_ {message_id} {signal_name} {SigSendType};\n'
     return output_seg05
 
