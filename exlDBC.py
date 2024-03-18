@@ -7,12 +7,13 @@ def chk_signalname(sigName):
     sigName = sigName.replace('(PS:自定义)','')
     sigName = sigName.replace(' \n(PS: 自定义)','')
     sigName = sigName.replace(' ','')
-    if '\n' in sigName and not 'EMMC_BYTE_' in sigName:
+    #if '\n' in sigName and not 'EMMC_BYTE_' in sigName:
+    if '\n' in sigName:
         sigName_split = sigName.split('\n')
         final_sigName = sigName_split[len(sigName_split)-1]
         #print(sigName,'  --->  ', final_sigName)
     else:
-        sigName = sigName.replace('\n','')
+        #sigName = sigName.replace('\n','')
         final_sigName = sigName
     return final_sigName
 
@@ -173,7 +174,7 @@ def dbc_bo_sg(df):
             receiver = receiver.replace('/',',')
 
             # SG_ {signal_name} {multiplexer_indicator} : {start_bit}|{signal_size}@{byte_order}{value_type} ({factor},{offset}) [{minimum}|{maximum}] "{unit}" {receiver}
-            if not 'EMMC_BYTE_' in signal_name:
+            r'''if not 'EMMC_BYTE_' in signal_name:
                 output_seg03 += f' SG_ {signal_name} {multiplexer_indicator}: {start_bit}|{signal_size}@{byte_order}{value_type} ({factor},{offset}) [{minimum}|{maximum}] "{unit}" {receiver}\n'
             # only for EMMC_BYTE_# signals
             else:
@@ -184,7 +185,8 @@ def dbc_bo_sg(df):
                     signal_name = f'EMMC_BYTE_{number}'
                     signal_size = 8
                     output_seg03 += f' SG_ {signal_name} {multiplexer_indicator}: {start_bit}|{signal_size}@{byte_order}{value_type} ({factor},{offset}) [{minimum}|{maximum}] "{unit}" {receiver}\n'
-                    start_bit = start_bit+8
+                    start_bit = start_bit+8'''
+            output_seg03 += f' SG_ {signal_name} {multiplexer_indicator}: {start_bit}|{signal_size}@{byte_order}{value_type} ({factor},{offset}) [{minimum}|{maximum}] "{unit}" {receiver}\n'
 
             if dataIndex == len(group_data)-1:
                 output_seg03 += '\n'
@@ -260,7 +262,8 @@ def dbc_ba(df):
                 signal_type = group_data['Signal Type'].iloc[dataIndex]
                 signal_type = signal_type.upper()
                 SigSendType = 1 # OnWrite
-                if (signal_type == 'M' or signal_type == 'E') and not 'EMMC_BYTE_' in signal_name:
+                #if (signal_type == 'M' or signal_type == 'E') and not 'EMMC_BYTE_' in signal_name:
+                if (signal_type == 'M' or signal_type == 'E'):
                     output_seg05 += f'BA_ "GenSigSendType" SG_ {message_id} {signal_name} {SigSendType};\n'
         else:
             pass
@@ -271,7 +274,7 @@ def dbc_ba(df):
             output_seg05 += f'BA_ "VFrameFormat" BO_ {message_id} {VFrameFormat};\n'
             
             # special cases, against to EMMC_BYTE_# signals
-            SigSendType = 1 # OnWrite
+            r'''SigSendType = 1 # OnWrite
             if message_id == 1045: # 0x415 (BCM40)
                 for number in range(0, 64):
                     signal_name = f'EMMC_BYTE_{number}'
@@ -280,6 +283,7 @@ def dbc_ba(df):
                 for number in range(64, 128):
                     signal_name = f'EMMC_BYTE_{number}'
                     output_seg05 += f'BA_ "GenSigSendType" SG_ {message_id} {signal_name} {SigSendType};\n'
+            '''
     return output_seg05
 
 
@@ -338,7 +342,8 @@ def dbc_val(df):
 
                     if 'EMMC_BYTE_' in signal_name:
                         # ValTable is not generated when the signal name contains "EMMC_BYTE_"
-                        gen_ValTable = False
+                        #gen_ValTable = False
+                        pass
                     else:
                         # split data to two elements (Value & Description) by ':'
                         data_split = data.split(":", 1)

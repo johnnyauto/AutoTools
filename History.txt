@@ -1,0 +1,14 @@
+v1.4 (2024/03/18)
+1. 針對EMMC_BYTE信號名稱命名更改為EMMC_BYTE#進行修改
+
+v1.3 (2024/03/08)
+1. 修正Event型態信號的'GenSigSendType'為'OnWrite', EMMC_BYTE_0~127信號以例外方式處理
+
+v1.2 (2024/03/06)
+1. 修正DBC生成器的process_data(), 避免Mab_value的值轉為0時在if判斷中被視為False
+
+v1.1 (2024/03/01)
+1. 修正當LIN signal的Receiver有2個或以上時導致格式錯誤
+
+v1.0 (2024/02/29)
+1. exl_DBC_LDF.exe v1.0
