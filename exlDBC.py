@@ -298,8 +298,12 @@ def dbc_val(df):
         for dataIndex in range(len(group_data)):
             # A flag used to determine whether to generate a ValTable
             gen_ValTable = True
-
             ValTable = group_data['Coding'].iloc[dataIndex]
+
+            # for debugging errors
+            signal_name = group_data['Signal Name'].iloc[dataIndex]
+            print('Process [Coding] at row "' + signal_name + '"')
+
             # if ValTable is not empty, create a value table for the signal
             if not pd.isna(ValTable):
                 # process the contents of ValTable
@@ -437,9 +441,31 @@ def dbc_main():
                     f.write(output_text)
                 print(f'\n{DBC_name} is generated!!\n')
                 input('Press [Enter] to continue.')
-            except:
-                print('\nError! 請確認所選擇的sheet內容是否正確')
-                input('Press [Enter] to continue.\n')
+            except Exception as e:
+                print('\n')
+                print(e)
+                print('Error! 請確認所選擇的sheet內容是否正確')
+                input('\nPress [Enter] to continue.\n')
+            
+            '''
+            sheetName = sheet_name_list[int(sheet_index)]
+            df = process_data(workbook, sheetName)
+
+            output_01 = dbc_ver_ns_bs()
+            output_02 = dbc_bu(df)
+            output_03 = dbc_bo_sg(df)
+            output_04 = dbc_ba_def()
+            output_05 = dbc_ba(df)
+            output_06 = dbc_val(df)
+            
+            # create a DBC file
+            output_text = output_01 + output_02 + output_03 + output_04 + output_05 + output_06
+            DBC_name = sheetName+'.dbc'
+            with open(DBC_name, 'w', encoding='utf-8') as f:
+                f.write(output_text)
+            print(f'\n{DBC_name} is generated!!\n')
+            input('Press [Enter] to continue.')'''
+
             
 if __name__ == '__main__':
     dbc_main()
