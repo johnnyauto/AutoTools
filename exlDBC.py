@@ -284,6 +284,15 @@ def dbc_ba(df):
                     signal_name = f'EMMC_BYTE_{number}'
                     output_seg05 += f'BA_ "GenSigSendType" SG_ {message_id} {signal_name} {SigSendType};\n'
             '''
+    
+    # add signal initial value
+    for index, row in df.iterrows():
+        if row["Default Initialised value"] != 0:
+            msgId = row["Message ID"]
+            sigName = row["Signal Name"]
+            initValue = df["Default Initialised value"].iloc[index].astype(int)
+            output_seg05 += f'BA_ "GenSigStartValue" SG_ {msgId} {sigName} {initValue};\n'
+
     return output_seg05
 
 

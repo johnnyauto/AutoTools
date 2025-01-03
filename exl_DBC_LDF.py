@@ -3,7 +3,7 @@ import exlLDF
 
 
 while True:
-    print('\n\n[DBC | LDF 產生器]')
+    print('\n\n[DBC | LDF 產生器 v1.6]')
     print('0: DBC file')
     print('1: LDF file')
     generator = input("請輸入數字選擇要產生哪種檔案, 預設值為'0': ")
